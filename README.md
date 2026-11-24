@@ -9,8 +9,9 @@ Aurea Air is the **PromptWars Challenge 6 · Urban Air Quality Assistant** for h
 1. Select Delhi, Household and Car. Use a 15:00–19:00 flexible window. Enter “School pickup is fixed at 3 pm. The grocery shop closes at 2 pm. I have no extra travel budget.”
 2. Generate the plan. Even without a model key, the planner recognizes the time conflict and suggests another collection arrangement.
 3. Change only the closing time to 5:30 pm. The planner can now consider forecast hours before closing, conditional on travel time and opening hours.
-4. Select the local advisory checkbox and generate again. Optional outdoor tasks are deferred even if a lower-pollution hour exists. The checkbox records an advisory the user has received.
-5. Use **Air guide** to compare timings, explore an alternative or check the limitations of a regional estimate. Escape closes the guide and returns focus to its launcher.
+4. Switch **Activity to schedule** to **Other outdoor activity** to compare hours for a separate outing. Shop closing times only constrain shopping errands.
+5. Select the local advisory checkbox and generate again. Optional outdoor tasks are deferred even if a lower-pollution hour exists. The checkbox records an advisory the user has received.
+6. Use **Air guide** to compare timings, explore an alternative or check the limitations of a regional estimate. Escape closes the guide and returns focus to its launcher.
 
 ## How the decision works
 
@@ -34,6 +35,7 @@ Open http://localhost:3000. To enable AI summaries, copy `.env.example` to `.env
 
 ```sh
 npm run format:check
+npm run typecheck
 npm test
 npm run build
 npm run package

@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": [],
+    "skipLibCheck": true
+  },
+  "include": ["lib/profile.mjs", "lib/schedule.mjs", "lib/routine.mjs", "lib/planner.mjs"]
+}

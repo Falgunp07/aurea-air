@@ -1,4 +1,4 @@
-import { cities } from '../lib/planner.mjs'
+import { cities } from '../lib/profile.mjs'
 import SelectField from './SelectField'
 
 const locations = Object.keys(cities)

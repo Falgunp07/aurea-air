@@ -111,3 +111,12 @@ test('a reported local outdoor advisory overrides even a low predicted hour', ()
   )
   assert.equal(valid({ ...profile, outdoorAdvisory: 'false' }), false)
 })
+
+test('a shop deadline applies only to the shopping activity, including for older profiles', () => {
+  const { activity, ...legacy } = { ...initial, routine: 'The shop closes at 2 pm.' }
+  assert.match(timing(legacy, hours, morning), /closes by the start/)
+  const walk = { ...legacy, activity: 'Other outdoor activity' }
+  assert.match(timing(walk, hours, morning), /18:00 IST/)
+  assert.match(timing({ ...walk, outdoorAdvisory: true }, hours, morning), /advisory/)
+  assert.equal(valid({ ...walk, activity: 'unrecognized' }), false)
+})

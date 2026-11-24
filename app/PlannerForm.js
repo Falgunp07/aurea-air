@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { audiences, indoorTips, routineLimit, travelModes } from '../lib/planner.mjs'
+import { activities, audiences, indoorTips, routineLimit, travelModes } from '../lib/profile.mjs'
 import SelectField from './SelectField'
 
 const hours = Array.from({ length: 24 }, (_, hour) => hour)
@@ -60,6 +60,13 @@ export default function PlannerForm({ profile, busy, onChange, onGenerate }) {
             name="travel"
             options={travelModes}
             value={profile.travel}
+            onChange={change}
+          />
+          <SelectField
+            label="Activity to schedule"
+            name="activity"
+            options={activities}
+            value={profile.activity}
             onChange={change}
           />
           <label className="wide">
