@@ -1,21 +1,33 @@
 {
-  "name": "goldair",
+  "name": "aurea-air",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Forecast-aware urban air quality planner for households and communities",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.test.mjs",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "package": "node scripts/package-worker.mjs",
+    "test:browser": "playwright test",
+    "format:check": "prettier --check ."
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "dependencies": {
     "next": "^15.5.29",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
+    "esbuild": "^0.28.2",
+    "prettier": "^3.10.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "overrides": {
+    "postcss": "8.5.33"
   }
 }

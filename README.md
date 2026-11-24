@@ -1,53 +1,63 @@
 # Aurea Air
 
-A daily air-quality assistant for the PromptWars **Challenge 6 · Urban Air Quality Assistant** vertical. Families and community organizers in six Indian cities can compare times for flexible errands, keep fixed commitments, and choose a practical change indoors.
+Aurea Air is the **PromptWars Challenge 6 · Urban Air Quality Assistant** for households and community organizers. It helps a user decide when a flexible errand fits the forecast, whether combining trips is feasible, and which indoor particle source they can address. It supports Delhi, Mumbai, Bengaluru, Kolkata, Chennai and Hyderabad.
 
-[Open the deployed app](https://aurea-air-daily-planner.classyparrot1.chatgpt.site)
+[Try the public app](https://aurea-air-daily-planner.classyparrot1.chatgpt.site)
 
-## Try the school pickup scenario
+## Try a decision that changes
 
-1. Select Delhi and Household. Enter “Pickup is fixed at 3 pm. The grocery shop closes at 2 pm. I have no extra travel budget.”
-2. Choose your flexible time window, usual travel mode and indoor concern. Select **Create my plan**.
-3. The plan displays a timing suggestion, transport alternative and indoor action. When Gemini responds, its summary accounts for the written constraints. When it is unavailable, the app labels the rules-based result **Standard plan**.
-4. Open **Air guide**, choose **Find a travel alternative**, then **The shop closes early**. The guide offers another option without requiring a model call.
+1. Select Delhi, Household and Car. Use a 15:00–19:00 flexible window. Enter “School pickup is fixed at 3 pm. The grocery shop closes at 2 pm. I have no extra travel budget.”
+2. Generate the plan. Even without a model key, the planner recognizes the time conflict and suggests another collection arrangement.
+3. Change only the closing time to 5:30 pm. The planner can now consider forecast hours before closing, conditional on travel time and opening hours.
+4. Select the local advisory checkbox and generate again. Optional outdoor tasks are deferred even if a lower-pollution hour exists. The checkbox records an advisory the user has received.
+5. Use **Air guide** to compare timings, explore an alternative or check the limitations of a regional estimate. Escape closes the guide and returns focus to its launcher.
 
-## Approach and logic
+## How the decision works
 
-The Next.js interface calls two server routes. The forecast route queries Open-Meteo for regional fine-particle concentrations and caches a successful result for ten minutes. The planning route validates the city, preferences, time window and routine length. It compares forecast hours inside the chosen window over the next 24 hours, chooses the earliest minimum on ties, and selects transport and indoor actions from household or community preferences.
-
-When configured, the server sends the submitted routine, selected options and standard plan to Google Gemini. The prompt asks for one feasible change respecting fixed times, opening hours and budget. The key stays on the server. Avoid entering names, addresses or sensitive personal details in the routine. A timeout or missing provider response leaves the standard plan available.
+- **Forecast.** The forecast route requests regional PM2.5 estimates from Open-Meteo / CAMS for the selected city center. A successful response is cached for ten minutes per server instance. Concurrent requests for a city share one upstream fetch. Empty responses are retried after fifteen seconds. The visible browser polls every five minutes and can fetch the public forecast directly if the server has no usable hourly data.
+- **Time and constraints.** The planner uses the next 24 hours in India Standard Time. It excludes elapsed hours and missing or negative concentrations, honors the flexible window and explicit shop closing times, and resolves a tie in favor of the earliest eligible hour. It displays the underlying concentration and an explicit date. Current model estimates expire after two hours.
+- **Routine and impact.** The standard plan recognizes explicit pickup and shop-closing times and zero-extra-budget language. Ambiguous times stay conditional. For households, combining compatible errands can avoid one separate drive. Community plans consider shared collection. Indoor advice responds to the selected concern.
+- **Generative AI.** When a server key is configured, Google Gemini receives the submitted routine, selected preferences and the computed suggestions. It writes a short explanation. Application code owns the forecast values, timing and travel recommendations. A completed response is labeled **Gemini-assisted plan**. Provider failure or limited capacity yields a **Standard plan**. The guide works independently of Gemini.
 
 ## Run locally
 
-Use Node.js 22 and npm. Clone this repository, enter its directory and run:
+Use Node.js 22.14 or later and npm. From a clone of this repository:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. To enable AI summaries, copy `.env.example` to `.env.local`, set `GEMINI_API_KEY` to your own key and restart. Set `GEMINI_MODEL` to select a supported model. The default is `gemini-2.5-flash`.
+Open http://localhost:3000. To enable AI summaries, copy `.env.example` to `.env.local`, set your own `GEMINI_API_KEY`, and restart. `GEMINI_MODEL` optionally selects a supported model. The default is `gemini-3.5-flash-lite`.
 
-## Verify and build
+## Verify the release
 
 ```sh
+npm run format:check
 npm test
 npm run build
-npm start
+npm run package
+npx playwright install chromium
+npm run test:browser
 ```
 
-The Node test suite covers forecast window selection, missing data, expired readings, invalid input, fixed appointments, and community and indoor alternatives. The optional Sites packaging script runs after the Next.js production build with `node scripts/package-worker.mjs`.
+The Node tests cover time-zone boundaries, feasible hours, ambiguous routines, user-reported advisories, unavailable providers, caching, request validation, Gemini success and fallback, and Worker HTTP behavior. Browser tests exercise the **packaged production Worker** with deterministic forecast fixtures at desktop and phone widths. They check keyboard navigation, focus restoration, validation, accessible names and common WCAG A/AA issues with axe. Browser tests use no external API keys. To run against an existing Chromium installation, set `CHROMIUM_PATH` to its executable. GitHub Actions runs the checks on pushes and pull requests. For a regular Next.js deployment, use `npm run build` followed by `npm start`.
 
-## Structure
+## Source map
 
-- `app/` contains the planner form, keyboard-accessible guided assistant and HTTP routes.
-- `lib/planner.mjs` and `lib/guide.mjs` contain the decision rules.
-- `lib/service.mjs` handles input validation, forecast retrieval, caching and Gemini requests.
-- `test/` holds reproducible decision-rule tests that run without network access or API keys.
+| Location                                              | Responsibility                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `app/`                                                | Accessible planner form, regional forecast display, guide dialog and client state |
+| `lib/routine.mjs`, `lib/planner.mjs`, `lib/guide.mjs` | Explicit routine constraints, shared forecast comparison and recommendation logic |
+| `lib/provider.mjs`, `lib/service.mjs`                 | Regional readings, request coordination, caching and API orchestration            |
+| `lib/request-body.mjs`, `lib/gemini.mjs`              | Bounded input, allowlisted model context and provider deadlines                   |
+| `hosting/`, `scripts/`                                | Build and serve the same application as a Sites Worker                            |
+| `test/`, `e2e/`                                       | Decision, API, security, accessibility and browser regression tests               |
 
-## Assumptions and limits
+## Privacy and limitations
 
-All times use India Standard Time. The six supported city centers represent regional conditions. PM2.5 values are model forecasts in µg/m³. A lower predicted value does not establish safe exposure or conditions on a specific street. The standard plan uses structured selections and leaves free-text interpretation to Gemini. The app has no live shop hours, transit fares or route data, so travel alternatives remain conditional.
+Routine text is sent to the configured Gemini provider when you request a plan. Leave out names, addresses and sensitive details. The app has no accounts or database, and its shared cache holds only regional forecast data. API credentials are server-only. The public planning endpoint validates its inputs, bounds the request body and limits optional model calls per running instance. Set provider quotas separately to cap total deployment spend.
 
-[Forecast documentation and CAMS attribution](https://open-meteo.com/en/docs/air-quality-api) · [EPA guidance on indoor particles](https://www.epa.gov/indoor-air-quality-iaq/sources-indoor-particulate-matter-pm)
+Forecasts are regional estimates in µg/m³. A lower predicted concentration does not certify safe exposure. Official advisories and station measurements provide local context. The app has no automated local-alert feed, live shop hours, exact route times or fare data. All suggested travel changes depend on the stated routine and local feasibility.
 
+[Open-Meteo forecast documentation and CAMS attribution](https://open-meteo.com/en/docs/air-quality-api) · [CPCB station observations](https://airquality.cpcb.gov.in/AQI_India/) · [EPA guidance on indoor particles](https://www.epa.gov/indoor-air-quality-iaq/sources-indoor-particulate-matter-pm)

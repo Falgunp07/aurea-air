@@ -1,2 +1,5 @@
-import {handle} from '../../../lib/service.mjs'
-export function GET(request){return handle(request,process.env)}
+import { handle } from '../../../lib/service.mjs'
+
+export async function GET(request) {
+  return handle(request, process.env)
+}

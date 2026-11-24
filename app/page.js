@@ -1,18 +1,120 @@
 'use client'
-import {useState,useEffect} from 'react'
-import {fetchRegionalForecast} from '../lib/provider.mjs'
+
+import { useEffect, useRef, useState } from 'react'
+import { baseline, initial } from '../lib/planner.mjs'
+import AirBrief from './AirBrief'
 import Guide from './Guide'
-import {cities,initial,baseline,indoorTips} from '../lib/planner.mjs'
-export default function Page(){
- const [p,set]=useState(initial),[air,read]=useState(null),[result,show]=useState(null),[busy,wait]=useState(false),[error,warn]=useState('')
- function edit(key,value){set({...p,[key]:value});show(null);warn('');if(key==='city')read(null)}
- useEffect(()=>{let active=true;const refresh=()=>fetch('/api/forecast?city='+p.city,{cache:'no-store'}).then(r=>r.json()).catch(()=>null).then(d=>d?.hours?.length?d:fetchRegionalForecast(p.city)).then(d=>{if(active)read(d)}).catch(()=>{if(active)read({hours:[]})});refresh();const timer=setInterval(refresh,300000);return()=>{active=false;clearInterval(timer)}},[p.city])
- function select(label,key,items){return <label>{label}<select disabled={busy} value={p[key]} onChange={e=>edit(key,typeof p[key]==='number'?Number(e.target.value):e.target.value)}>{items.map(v=><option key={v} value={v}>{typeof v==='number'?String(v).padStart(2,'0')+':00':v}</option>)}</select></label>}
- async function generate(e){e.preventDefault();if(p.start>p.end||!p.routine.trim()){warn('Enter a routine and choose an end time after or equal to the start.');return}wait(true);try{const r=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p),signal:AbortSignal.timeout(16000)});if(!r.ok)throw Error();const plan=await r.json();if(plan.forecastAvailable===false && air?.hours?.length){plan.timing=baseline(p,air.hours).timing}show(plan)}catch{show(baseline(p,air?.hours||[]))}finally{wait(false);requestAnimationFrame(()=>document.querySelector('.result')?.focus())}}
- const hours=Array.from({length:24},(_,i)=>i)
- return <><header><a className="brand" href="#"><span className="mark">☼</span> Aurea <em>Air</em></a><nav><a href="#brief">Air brief</a><a href="#planner">Daily planner</a></nav></header><main><section id="brief" className="hero"><div className="vista" aria-hidden="true"><div className="orb"/><i className="ridge far"/><i className="ridge mid"/><i className="ridge near"/></div><div className="heroText"><div className="eyeline"><span className="line"/>URBAN AIR QUALITY ASSISTANT</div><h1>Your daily<br/><em>air brief.</em></h1><p>Local air conditions and small changes<br/>for the day ahead.</p></div><div className="caption">{p.city} · INDIA</div></section>
- <section className="reading">{select('Forecast location','city',Object.keys(cities))}<div><small>Current regional PM2.5 estimate</small><strong>{air?.current?air.current.pm2_5+' µg/m³':air?'Unavailable':'Loading…'}</strong>{air?.current&&<small>{air.current.time.replace('T',' · ')} IST</small>}</div><div><small>Model estimates · refresh every 5 min</small><a href="https://open-meteo.com/en/docs/air-quality-api">Open-Meteo · CAMS</a><small><a href="https://airquality.cpcb.gov.in/AQI_India/">Station observations · CPCB</a></small></div></section>
- <section id="planner"><div className="intro"><span className="eyeline">DAILY PLANNER</span><h2>Make a plan.</h2><p>Tell us what’s fixed and what can move. Compare forecast hours, find a lower-emission trip and choose one change indoors.</p><small>All times are local to India.</small></div><form onSubmit={generate}><fieldset className="fields" disabled={busy}>{select('Planning for','audience',['Household','Community'])}{select('Usual travel','travel',['Car','Transit','Walking'])}<label className="wide">Your routine and constraints<textarea required maxLength={600} value={p.routine} onChange={e=>edit('routine',e.target.value)}/></label>{select('Flexible tasks from','start',hours)}{select('Until','end',hours)}{select('Indoor concern','indoor',Object.keys(indoorTips))}</fieldset>{error&&<p role="alert">{error}</p>}<button disabled={busy}>{busy?'Preparing your plan…':'Create my plan'}</button></form></section>
- {result&&<section className="result" tabIndex={-1}><span className="eyeline">{result.source}</span><h2>Your {p.audience.toLowerCase()} plan</h2><p>{result.summary}</p>{[['When to go',result.timing],['Getting around',result.travel],['Indoors',result.indoor]].map(([title,body])=><div key={title}><h3>{title}</h3><p>{body}</p></div>)}<a href="https://www.epa.gov/indoor-air-quality-iaq/sources-indoor-particulate-matter-pm">Indoor air guidance · EPA</a></section>}</main><Guide profile={p} air={air}/><footer>Aurea Air <span>Urban air quality assistant</span></footer></>
+import PlannerForm from './PlannerForm'
+import useForecast from './useForecast'
+
+async function requestPlan(profile, forecast, signal) {
+  const localPlan = () => baseline(profile, forecast?.hours ?? [])
+  try {
+    const response = await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+      signal,
+    })
+    if (response.ok) {
+      const plan = await response.json()
+      if (plan.forecastAvailable === false && forecast?.hours?.length) {
+        return { ...plan, timing: localPlan().timing }
+      }
+      return plan
+    }
+  } catch {
+    // The browser may still have a usable forecast if the planning endpoint times out.
+  }
+  return localPlan()
 }
 
+function PlanResult({ plan, audience }) {
+  const heading = useRef(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [plan])
+
+  return (
+    <section className="result" aria-labelledby="result-title">
+      <span className="eyeline">{plan.source}</span>
+      <h2 id="result-title" ref={heading} tabIndex={-1}>
+        Your {audience.toLowerCase()} plan
+      </h2>
+      <p>{plan.summary}</p>
+      <h3>When to go</h3>
+      <p>{plan.timing}</p>
+      <h3>Getting around</h3>
+      <p>{plan.travel}</p>
+      <h3>Indoors</h3>
+      <p>{plan.indoor}</p>
+      <a href="https://www.epa.gov/indoor-air-quality-iaq/sources-indoor-particulate-matter-pm">
+        Indoor air guidance · EPA
+      </a>
+    </section>
+  )
+}
+
+export default function Page() {
+  const [profile, setProfile] = useState(initial)
+  const [plan, setPlan] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const activeRequest = useRef(null)
+  const forecast = useForecast(profile.city)
+
+  useEffect(() => () => activeRequest.current?.abort(), [])
+
+  function changeProfile(name, value) {
+    setProfile((previous) => ({ ...previous, [name]: value }))
+    setPlan(null)
+  }
+
+  async function generate() {
+    if (activeRequest.current) return
+    const controller = new AbortController()
+    activeRequest.current = controller
+    setBusy(true)
+    try {
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(18000)])
+      const nextPlan = await requestPlan(profile, forecast, signal)
+      if (!controller.signal.aborted) setPlan(nextPlan)
+    } finally {
+      activeRequest.current = null
+      if (!controller.signal.aborted) setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <a className="skip" href="#main">
+        Skip to main content
+      </a>
+      <header>
+        <a className="brand" href="#brief">
+          <span className="mark" aria-hidden="true">
+            ☼
+          </span>{' '}
+          Aurea <em>Air</em>
+        </a>
+        <nav aria-label="Main navigation">
+          <a href="#brief">Air brief</a>
+          <a href="#planner">Daily planner</a>
+        </nav>
+      </header>
+      <main id="main" tabIndex={-1}>
+        <AirBrief
+          city={profile.city}
+          forecast={forecast}
+          onChange={changeProfile}
+          disabled={busy}
+        />
+        <PlannerForm profile={profile} busy={busy} onChange={changeProfile} onGenerate={generate} />
+        {plan && <PlanResult plan={plan} audience={profile.audience} />}
+      </main>
+      <Guide profile={profile} air={forecast} />
+      <footer>
+        Aurea Air <span>Urban air quality assistant</span>
+      </footer>
+    </>
+  )
+}
